@@ -12,18 +12,27 @@ def build_topo_names
     directories.push match
   end
   
-  puts "============="
-
   directories.shift
   directories.each do |dir|
     url = "http://fsgeodata.fs.fed.us/rastergateway/data/#{dir[0]}/fstopo/"
+    puts url
     http = Curl.get(url)
     http.body_str.scan(/"(.*)\.zip"/) do |match|
       map_names.push match
     end
-    break if map_names.length > 100
   end
 
   map_names
 end
 
+def write_to_file
+  map_names = build_topo_names
+
+  File.open('map_names.txt', 'w') do |file|
+    map_names.each do |name|
+      file.puts name
+    end
+  end
+end
+
+write_to_file
