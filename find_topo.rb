@@ -2,6 +2,11 @@ require 'pry'
 require 'gpx'
 require_relative 'point'
 
+
+# All boundary/box datastructures cheat: [xmin,xmax,ymin,ymax] instead of 
+# polygon/point structures
+
+
 def load_names
   names = []
 
@@ -21,15 +26,15 @@ def to_decimal(x)
 end
 
 def get_map_bounds(map_num)
-  # Uses 8 minutes for default width, even though this is not technically
-  # correct. Would be better to use 7.5, but I have no way of knowing 
-  # from the map name if the corner is at 0 or 30 seconds.
-  
+  # Correctly assigns boundaries based on 7.5 quad width 
   w = 7.5/60
   offset = 0.5/60
 
+  # Make sure to add 00 for the seconds position
   y_dms = (map_num[0..3]+"00").to_i
   y = to_decimal(y_dms)
+
+  # check if corner is evenly divisble by 7.5, if not add offset
   unless y % w == 0
     y += offset
   end
@@ -45,17 +50,20 @@ def get_map_bounds(map_num)
   [x,x2,y,y2]
 end
 
-def contains_point?(lat, long, bounds)
-  if bounds[0] < long && long < bounds[1]
-    if bounds[2] < lat && lat < bounds[3]
-      return true
-    end
-  end
-  false
-end
+# Rewritten 
+#def contains_point?(lat, long, bounds)
+  #if bounds[0] < long && long < bounds[1]
+    #if bounds[2] < lat && lat < bounds[3]
+      #return true
+    #end
+  #end
+  #false
+#end
 
-def find_map(lat, long, map_names)
+def find_map_by_point(lat, long, map_names)
   map_names.each do |name|
+    
+    # Extract the latlon number from each name
     map_num = name[/\d*/]
     bounds = get_map_bounds(map_num)
     return name if contains_point?(lat, long, bounds)
@@ -63,22 +71,94 @@ def find_map(lat, long, map_names)
   false
 end
 
+def find_map_by_bound(track_bound, map_names)
+  maps = []
+
+  map_names.each do |name|
+    
+    # Extract the latlon number from each name
+    map_num = name[/\d*/]
+    bounds = get_map_bounds(map_num)
+    maps.push name if intersects?(track_bound, bounds)
+  end
+  maps
+end
+
+def assign_smaller(min, x)
+  min = if x < min
+          x
+        else
+          min
+        end
+end
+
+def get_track_bounds(gpx)
+  min_x = 180
+  max_x = 0
+  min_y = 180
+  max_y = 0
+  gpx.routes[0].points.each do |pt|
+    min_x = pt.lon.abs if pt.lon.abs < min_x
+    max_x = pt.lon.abs if pt.lon.abs > max_x
+    min_y = pt.lat if pt.lat < min_y
+    max_y = pt.lat if pt.lat > max_y
+  end
+
+  [min_x,max_x,min_y,max_y]
+end
+
+def contains_point?(box, point)
+  #box should be array [min_x,max_x,min_y,max_y]
+  # point is [x,y]
+
+  x = point[0]
+  y = point[1]
+
+  if box[0] < x && x < box[1] && box[2] < y && y < box[3]
+    true
+  else
+    false
+  end
+end
+
+def intersects?(box1, box2)
+  # first check to see if poly2 contains poly1's points
+  # next check to see if poly1 contains poly2's points
+
+  (0..1).each do |x|
+    (2..3).each do |y|
+      return true if contains_point?(box1, [box2[x],box2[y]])
+    end
+  end
+
+  (0..1).each do |x|
+    (2..3).each do |y|
+      return true if contains_point?(box2, [box1[x],box1[y]])
+    end
+  end
+  false
+end
+
+
+def load_gpx(file_name)
+  gpx = GPX::GPXFile.new(:gpx_file => file_name)
+end
+
 def main
   map_names = load_names
 
-
-  maps = []
-
-  gpx = GPX::GPXFile.new(:gpx_file => 'export.gpx')
-  gpx.routes[0].points.each do |pt|
-    maps.push find_map(pt.lat, pt.lon.abs, map_names)
-  end
+  file_name = 'export.gpx'
+  gpx = GPX::GPXFile.new(:gpx_file => file_name)
+  track_bound = get_track_bounds(gpx)
+  maps = find_map_by_bound(track_bound, map_names)
+  #gpx.routes[0].points.each do |pt|
+    #maps.push find_map(pt.lat, pt.lon.abs, map_names)
+  #end
 
   puts maps.uniq
 
 end
 
 main
-
 
 
