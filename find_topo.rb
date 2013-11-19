@@ -1,9 +1,17 @@
-require 'pry'
+#!/usr/bin/env ruby
+
 require 'gpx'
 require 'optparse'
 require 'ostruct'
 require 'open3'
+require 'pp'
 
+# This is a simple utility that takes either a GPX track or a single
+# point and fingures out which USFS topo maps containt the track/point.
+# Outputs a list a map names which can be downloaded from:
+# http://fsgeodata.fs.fed.us/rastergateway/states-regions/regions.php
+#
+# Maintainer: mbsperry at gmail
 
 # All boundary/box datastructures cheat: [xmin,xmax,ymin,ymax] instead of 
 # polygon/point structures
@@ -245,7 +253,7 @@ end
 options = parse(ARGV)
 
 # Debugging
-pp options
+# pp options
 
 main(options)
 
