@@ -1,10 +1,15 @@
 require 'pry'
 require 'gpx'
-require_relative 'point'
+require 'optparse'
+require 'ostruct'
+require 'open3'
 
 
 # All boundary/box datastructures cheat: [xmin,xmax,ymin,ymax] instead of 
 # polygon/point structures
+#
+# UTM coordinates default to easting,northing
+# Degree coordinates default to latitude, longitude
 
 
 def load_names
@@ -50,23 +55,15 @@ def get_map_bounds(map_num)
   [x,x2,y,y2]
 end
 
-# Rewritten 
-#def contains_point?(lat, long, bounds)
-  #if bounds[0] < long && long < bounds[1]
-    #if bounds[2] < lat && lat < bounds[3]
-      #return true
-    #end
-  #end
-  #false
-#end
-
 def find_map_by_point(lat, long, map_names)
   map_names.each do |name|
     
     # Extract the latlon number from each name
     map_num = name[/\d*/]
     bounds = get_map_bounds(map_num)
-    return name if contains_point?(lat, long, bounds)
+
+    #contains_point? requires the point to be in x,y format
+    return name if contains_point?(bounds, [long.to_f.abs,lat.to_f.abs])
   end
   false
 end
@@ -121,6 +118,16 @@ def contains_point?(box, point)
   end
 end
 
+# Rewritten for no particular reason
+#def contains_point?(lat, long, bounds)
+  #if bounds[0] < long && long < bounds[1]
+    #if bounds[2] < lat && lat < bounds[3]
+      #return true
+    #end
+  #end
+  #false
+#end
+
 def intersects?(box1, box2)
   # first check to see if poly2 contains poly1's points
   # next check to see if poly1 contains poly2's points
@@ -139,26 +146,106 @@ def intersects?(box1, box2)
   false
 end
 
+def utm_to_latlong(point)
+  # Format for UTM is easting, northing
+  # Uses gdal command line utility, which oddly requires the coordinates
+  # to be supplied on stdin -- I can't seem to figure out how to give them
+  # on the command line.
+  
+  src = "EPSG:3717"
+  dst = "EPSG:4269"
 
-def load_gpx(file_name)
-  gpx = GPX::GPXFile.new(:gpx_file => file_name)
+  cmd = "gdaltransform -s_srs #{src} -t_srs #{dst}"
+
+  ll_string = ""
+
+  Open3.popen2e(cmd) do |i,o|
+    i.print "#{point[0]} #{point[1]}"
+    i.close
+    ll_string = o.gets
+  end
+
+  #gdaltransform returns string "long lat elevation"
+  latlong = ll_string.split
+
+  [latlong[1],latlong[0]]
+
 end
 
-def main
+def main(options)
   map_names = load_names
 
-  file_name = 'export.gpx'
-  gpx = GPX::GPXFile.new(:gpx_file => file_name)
-  track_bound = get_track_bounds(gpx)
-  maps = find_map_by_bound(track_bound, map_names)
-  #gpx.routes[0].points.each do |pt|
-    #maps.push find_map(pt.lat, pt.lon.abs, map_names)
-  #end
+  if options.use_file == true
+    file_name = options.file_name
 
-  puts maps.uniq
+    # Error if file does not exist
+    unless File.exists?(file_name)
+      puts "File does not exist"
+      return false
+    end
+
+    gpx = GPX::GPXFile.new(:gpx_file => file_name)
+    track_bound = get_track_bounds(gpx)
+    maps = find_map_by_bound(track_bound, map_names)
+    puts maps
+  elsif options.use_point == true
+    if options.proj == "latlong"
+      point = options.point
+    else
+      point = utm_to_latlong(options.point)
+    end
+
+    map = find_map_by_point(point[0],point[1], map_names)
+    puts map
+  end
 
 end
 
-main
+def parse(args)
+  options = OpenStruct.new
+  options.use_point = false
+  options.use_file = true
+  options.proj = "utm"
 
+  opt_parser = OptionParser.new do |opts|
+    opts.banner = "Usage: find_topo.rb [options] [track_file]"
+    opts.separator "Maintainer: mbsperry at gmail"
+
+    opts.separator ""
+    opts.separator "Finds the USFS topo that contains the given GPX track or point"
+    opts.separator "If run with no commands: reads track from 'export.gpx' file in the working directory."
+
+    opts.separator ""
+    opts.separator "Specific options:"
+
+    opts.on("-c [PROJECTION]", "--projection [PROJECTION]", "Either 'latlong' or 'utm'. Defaults to 'utm'.") do |proj|
+      options.proj = proj || "utm"
+    end
+
+    opts.on("-p X,Y", "--point X,Y", Array, "Find topo which contains the specified point") do |point|
+      options.use_point = true
+      options.use_file = false
+      options.point = point
+    end
+
+    opts.on("-f", "--file [FILE]", "Use specified gpx file, defaults to 'export.gpx'") do |file|
+      options.use_file = true
+      options.file_name = file || 'export.gpx'
+    end
+
+
+  end
+
+  opt_parser.parse!(args)
+  options.file_name = args.pop || 'export.gpx'
+
+  options
+end
+
+options = parse(ARGV)
+
+# Debugging
+pp options
+
+main(options)
 
