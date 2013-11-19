@@ -9,6 +9,8 @@ find_topo is a simple utility to speed up that process.
 
 - Can use either GPX track or a single point
 - Outputs a list of USFS topo names that contain that track/point
+- At http://caltopo.com/ you can mark out a trail and download the gpx
+  track
 
 #### Requirements
 
