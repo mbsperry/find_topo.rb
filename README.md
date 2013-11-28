@@ -14,12 +14,13 @@ find_topo is a simple utility to speed up that process.
 
 #### Requirements
 
-- GPX gem from http://gpx.rubyforge.org/
+- [GPX gem](http://gpx.rubyforge.org/)
+- [GDAL library](http://www.gdal.org) if using UTM coordinates
 
 #### Use
 
 - By default will open a file named 'export.gpx' in the working
   directory and output all maps that contain points in that track.
-- find_topo.rb --help for more options.
+- run `find_topo.rb --help` for more options.
 
 That's it!
