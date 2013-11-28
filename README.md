@@ -21,6 +21,13 @@ find_topo is a simple utility to speed up that process.
 
 - By default will open a file named 'export.gpx' in the working
   directory and output all maps that contain points in that track.
-- run `find_topo.rb --help` for more options.
+- `find_topo.rb --help` 
+
+```
+Specific options:
+    -c, --projection [PROJECTION]    Either 'latlong' or 'utm'. Defaults to 'utm'.
+    -p, --point X,Y                  Find topo which contains the specified point
+    -f, --file [FILE]                Use specified gpx file, defaults to 'export.gpx'
+```
 
 That's it!
